@@ -238,3 +238,23 @@ class CrateCrane:
         for moves in self.movements:
             self.move_crate(moves)
         self.top_boxes = ''.join([x[-1] for x in self.stack_dict.values() if x != []])
+        
+#### Day 6 ####
+class CommunicationDevice:
+    def __init__(self, signal):
+        self.signal = signal
+        self.marker_detection = None
+        
+        self.marker_detection = self.process_signal(n=4)
+        self.message_detection = self.process_signal(n=14)
+    
+    def process_signal(self, n):
+        set_list = []
+        for idx in range(0, len(self.signal)):
+            sig = self.signal[idx]
+            set_list.append(sig)
+            if len(set(set_list)) < len(set_list):
+                #remove everything from the first index 
+                set_list = set_list[set_list.index(sig)+1:]
+            if len(set_list) == n:
+                return idx+1
