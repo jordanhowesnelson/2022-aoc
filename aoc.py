@@ -1,5 +1,6 @@
 #### General 
 import string
+import numpy as np
 
 def read_data(date_num, kind):
     path = f'../data/{kind}-day{date_num}.txt'
@@ -258,3 +259,174 @@ class CommunicationDevice:
                 set_list = set_list[set_list.index(sig)+1:]
             if len(set_list) == n:
                 return idx+1
+            
+#### Day 7 ####
+class FileSystem:
+    def __init__(self, raw_tree):
+        self.raw_tree = raw_tree
+        self.n = len(self.raw_tree)
+        self.tree_dict = {}
+        self.cd=None
+        self.path = []
+        self.total_disk_space = 70000000
+        self.update_disk_space = 30000000
+        
+        self.parse_tree()
+        self.get_dir_sizes()
+        
+    def get_path_str(self):
+        return ''.join(self.path)
+    
+    def get_file_size(self):
+        return int(self.branch.split(' ')[0])
+    
+    def clean_branch(self):
+        return self.branch.replace('$ cd ', '').replace('dir ', '')
+        
+    def parse_tree(self):
+        self.branch = self.raw_tree[0]
+        self.tree_dict[self.clean_branch()] = {'files':[], 'dir':[], 'fileSize':0, 'dirSize':0}
+        self.path.append(self.clean_branch())
+        for x in range(1, self.n):
+            self.branch = self.raw_tree[x]
+            if self.branch.endswith('..'):
+                self.path.pop()
+            elif self.branch.startswith('$ cd'): 
+                self.path.append(self.clean_branch()+'/')
+                self.tree_dict[self.get_path_str()] = {'files':[], 'dir':[], 'fileSize':0, 'dirSize':0}
+                continue
+            elif self.branch.startswith('$ ls'):
+                continue
+            elif self.branch.startswith('dir'):
+                self.tree_dict[self.get_path_str()]['dir'].append(self.clean_branch())
+            elif self.branch[0].isnumeric():
+                self.tree_dict[self.get_path_str()]['files'].append(self.branch)
+                self.tree_dict[self.get_path_str()]['fileSize'] += self.get_file_size()
+                
+    def get_dir_sizes(self):
+        self.sub_dir_list = sorted(self.tree_dict.keys(), key=lambda x: x.count('/'), reverse=True)
+        for key in self.sub_dir_list:
+        #if they have no sub dirs just get total
+            if self.tree_dict[key]['dir'] != []:
+                for sub in self.tree_dict[key]['dir']:
+                    self.tree_dict[key]['dirSize'] += self.tree_dict[key+sub+'/']['totalSize']
+            self.tree_dict[key]['totalSize'] = (self.tree_dict[key]['dirSize'] + 
+                                                self.tree_dict[key]['fileSize'])
+    
+    def get_total_size_limit(self, lim=100000, func=np.less_equal):
+        '''returns list of dir totals all less than lim'''
+        return [v['totalSize'] for k, v in self.tree_dict.items() if func(v['totalSize'], lim)]
+    
+    def get_delete_size(self):
+        used_space = self.tree_dict['/']['totalSize']
+        available_space = (self.total_disk_space - used_space)
+        space_needed = self.update_disk_space - available_space
+        return sorted(self.get_total_size_limit(lim=space_needed, func=np.greater))[0]
+    
+#### Day 8 ####
+class TreeMap:
+    def __init__(self, raw_map):
+        self.raw_map = raw_map
+        self.map = np.array([[int(y) for y in x] for x in self.raw_map])
+        self.row, self.col = self.map.shape
+        self.map_dict = {}
+        
+        self.assess_visibility()
+        self.assess_scenery()
+        
+    def get_max(self, cur, arr_slice):
+        return np.product(np.greater(cur, arr_slice))
+    
+    def assess_visibility(self):
+        for r in range(self.row):
+            for c in range(self.col):
+
+                cd = r, c
+                ch = self.map[cd]
+                
+                self.map_dict[cd] = {'n':None, 's':None, 'e':None, 'w':None}
+                self.map_dict[cd]['height'] = ch
+
+                #need to take a sub array from each direction
+                #if its the max, it's visible
+                #print(cd)
+                #print('cur point', self.map[cd])
+
+                #east
+                #print('e arr to check', self.map[r, c+1:])
+                neighbors = self.map[r, c+1:]
+                self.map_dict[cd]['eNeigh'] = neighbors
+                try:
+                    e = self.get_max(ch, neighbors)
+                except:
+                    e = 1
+                self.map_dict[cd]['e'] = e
+
+                #west
+                #print('w arr to check', self.map[r, :c])
+                neighbors = self.map[r, :c]
+                self.map_dict[cd]['wNeigh'] = np.flip(neighbors)
+                try: 
+                    w = self.get_max(ch, neighbors)
+                except:
+                    w = 1
+                self.map_dict[cd]['w'] = w
+
+                #north
+                #print('n arr to check', self.map[:r, c])
+                neighbors = self.map[:r, c]
+                self.map_dict[cd]['nNeigh'] = np.flip(neighbors)
+                try:
+                    n = self.get_max(ch, neighbors)
+                except:
+                    n = 1
+                self.map_dict[cd]['n'] = n
+
+                #south
+                #print('s arr to check', self.map[r+1:, c])
+                neighbors = self.map[r+1:, c]
+                self.map_dict[cd]['sNeigh'] = neighbors
+                try:
+                    s = self.get_max(ch, neighbors)
+                except:
+                    s = 1
+                self.map_dict[cd]['s'] = s
+
+                #eval vis
+                self.map_dict[cd]['visible'] = np.max([e, w, n, s])
+        self.num_vis = sum([v['visible'] for v in self.map_dict.values()])
+        return
+    
+    def assess_scenery(self):
+        for k in self.map_dict.keys():
+            #print(k)
+            scene_list = []
+            cd = self.map_dict[k]['height']
+            for hood in ['eNeigh', 'wNeigh', 'nNeigh', 'sNeigh']:
+                scene_count = 0
+                nei_list = self.map_dict[k][hood]
+                if len(nei_list) == 0:
+                    scene_list.append(scene_count)
+                    continue
+                else:
+                    for idx in range(len(nei_list)):
+                        #print(hood)
+                        cn = nei_list[idx]
+                        #print('cd', cd, 'cn', cn)
+                        
+                        if (cn >= cd):
+                            scene_count += 1
+                            #print('cn >= cd, ending run')
+                            break
+
+                        elif (cd > cn):
+                            scene_count += 1
+                            #print('continuing to next')
+
+                scene_list.append(scene_count)
+            self.map_dict[k]['sceneList'] = scene_list
+            self.map_dict[k]['sceneCount'] = np.product(scene_list)
+        return
+
+    def get_highest_scene(self):
+        return np.max([v['sceneCount'] for v in self.map_dict.values()])
