@@ -430,3 +430,220 @@ class TreeMap:
 
     def get_highest_scene(self):
         return np.max([v['sceneCount'] for v in self.map_dict.values()])
+    
+#### Day 9 ####
+
+def distance(p1, p2):
+    x1, y1 = p1
+    x2, y2 = p2
+    return np.sqrt(np.square(x1 - x2) + np.square(y1 - y2))
+
+class Snake:
+    def __init__(self, moves, knot_list=['head', 'tail']):
+        self.moves = moves
+        self.knot_list = knot_list
+        self.track_dict = {}
+
+        self.move_dict = {'R':lambda x: (x, 0), #would need to flip for range
+                          'L':lambda x: (-x, 0),
+                          'U':lambda y: (0, y),
+                          'D':lambda y: (0, -y) #would need to flip for range
+                         }
+        
+        for knot in self.knot_list:
+            self.__setattr__(knot, [0,0])
+        
+        self.check_and_record((0,0), record_for=self.knot_list)
+        self.process_instructions()
+        
+    def build_dict(self, move):
+        self.track_dict[move] = {}
+        for x in self.knot_list:
+            self.track_dict[move][x] = 0
+        
+    def parse_move(self, move):
+        self.current_move = move
+        d_, n_ = move.split(' ')
+        self.cur_direction = d_
+        self.step_n = int(n_)
+        self.cord_move = self.move_dict[self.cur_direction](self.step_n)
+
+    
+    def check_and_record(self, clean_move, record_for=['head']):
+        check_for = tuple(clean_move)
+        #print('dict check for', check_for)
+        if check_for not in self.track_dict.keys():
+            self.build_dict(check_for)
+        for rec in record_for:
+            self.track_dict[check_for][rec] += 1
+            
+    def get_passing_distance(self, head, tail):
+        self.distance_between = distance(head, tail)
+        return ((self.distance_between == 0) | 
+                (self.distance_between == 1) |
+                (self.distance_between == np.sqrt(2))
+               )
+
+    def process_move(self, move):
+        #print('~~~~~~~move~~~~~~~', move)
+        #org contents
+        self.parse_move(move)
+        
+        #move H iteratively, checking tail each time
+        for val in np.ones(self.step_n):
+            for i in range(len(self.knot_list)-1):
+                head = self.knot_list[i]
+                tail = self.knot_list[i+1]
+
+                if i == 0:
+                    self.__setattr__(head, np.add(self.move_dict[self.cur_direction](int(val)), self.__getattribute__(head)))
+                    self.check_and_record(self.__getattribute__(head), [head])
+                self.distance_between = distance(self.__getattribute__(tail), self.__getattribute__(head))
+#                 print(f'distance between {tail} and {head}', self.distance_between)
+                if ((self.distance_between == 0) | 
+                    (self.distance_between == 1) |
+                    (self.distance_between == np.sqrt(2))
+                   ):
+#                     print('no move needed')
+#                     print(f'{head} at', self.__getattribute__(head))
+#                     print(f'{tail} at', self.__getattribute__(tail))  
+#                     print()
+                    continue
+                    
+                else:
+                    new_loc = self.get_new_location(self.__getattribute__(head), self.__getattribute__(tail))
+                    self.__setattr__(tail, np.add(new_loc, self.__getattribute__(tail)))
+                    self.check_and_record(self.__getattribute__(tail), [tail])
+
+#                 print(f'{head} at', self.__getattribute__(head))
+#                 print(f'{tail} at', self.__getattribute__(tail))      
+#                 print()
+
+                
+        return
+            
+    def process_instructions(self):
+        self.prior_tail = np.array([0,0])
+        for m in self.moves:
+            self.process_move(m)
+
+    
+    def get_new_location(self, head, tail):
+        '''return the new point'''
+        x1, y1 = head
+        x2, y2 = tail
+        x_diff = x1 - x2
+        y_diff = y1 - y2
+        #if x's are zero, return np.sign of ys diff
+        if x_diff == 0:
+            move_n = np.sign(y_diff)
+            move_1 = self.move_dict['U'](move_n)
+            return move_1
+        elif y_diff == 0:
+            move_n = np.sign(x_diff)
+            move_1 = self.move_dict['R'](move_n)
+            return move_1
+        else:
+            x_move = np.sign(x_diff)  
+            y_move = np.sign(y_diff)   
+
+            return [x_move, y_move]
+    
+                
+    def get_space_counts(self, report_for='tail'):
+        return sum([x[report_for] >= 1  for x in  self.track_dict.values()])
+    
+#### Day 10 ####
+class Signal:
+    def __init__(self, signal):
+        self.signal = signal
+        self.last = signal.split(' ')[-1]
+        self.symbol = ''
+
+        if self.last == 'noop':
+            self.action = self.last
+            self.X = [0]
+            self.cycle = 1
+        else:
+            self.action = 'addx'
+            self.X = [0, int(self.last)]
+            self.cycle = 2
+
+class Tube:
+    def __init__(self, signals, interestings=[]):
+        self.signals = signals
+        self.cycle_list = []
+        self.cycle = 0
+        self.register = []
+        self.processed = []
+        self.interestings = interestings
+        self.symbol_dict = {}
+        self.symbol_str = ''
+        
+
+        self._run()
+        
+    def process_signal(self, signal):
+        s = Signal(signal)
+        self.processed.append(s)
+        self.register += s.X
+        self.cycle += s.cycle        
+        return 
+    
+    def _run(self):
+        for idx in range(len(self.signals)):
+            self.cycle_list.append(self.cycle)
+            self.position = idx
+            signal = self.signals[idx]
+            self.process_signal(signal)
+        
+    def get_register_value(self, n=None):
+        if n:
+            return 1+sum(self.register[:n-1])
+        else:    
+            return 1+sum(self.register[:self.cycle])
+
+    
+    def get_signal_strength(self, n):
+        rv = self.get_register_value(n)
+        if n:
+            return rv*n
+        else:
+            return rv*self.cycle
+
+    
+    def get_interesting_signals(self):
+        interesting_stregnths = []
+        for i in self.interestings:
+            interesting_stregnths.append(self.get_signal_strength(n=i))
+        return sum(interesting_stregnths)
+    
+    def assign_symbols(self, consule_range=range(0, 241, 40)):
+        for i in range(0, self.cycle+1):
+            if i > consule_range.step-1:
+                row_break = np.array(consule_range)
+                idx = np.where(row_break <= i)[-1][-1]
+                mod = row_break[idx]
+                lookup = i%mod
+            else:
+                lookup = i
+            self.symbol_str += (get_symbol(lookup, sum(self.register[0:i])))
+            self.symbol_dict[i] = {lookup:sum(self.register[0:i])}
+        return 
+
+    def print_consule(self, consule_range=range(0, 241, 40)):
+            if self.symbol_str == '':
+                self.assign_symbols(consule_range)
+            for x in consule_range:
+                print(self.symbol_str[x-consule_range.step:x])
+    
+def get_symbol(cycle, sprite_1):
+    #get from processed, type of signal so can get cycle passage
+    s = sprite_1
+    e = s+3
+    if cycle in range(s, e):
+        return '#'
+    else:
+        return '.'
+
+#### Day 11 ####
