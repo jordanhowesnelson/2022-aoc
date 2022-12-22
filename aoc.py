@@ -618,10 +618,10 @@ class Tube:
             interesting_stregnths.append(self.get_signal_strength(n=i))
         return sum(interesting_stregnths)
     
-    def assign_symbols(self, consule_range=range(0, 241, 40)):
+    def assign_symbols(self, console_range=range(0, 241, 40)):
         for i in range(0, self.cycle+1):
-            if i > consule_range.step-1:
-                row_break = np.array(consule_range)
+            if i > console_range.step-1:
+                row_break = np.array(console_range)
                 idx = np.where(row_break <= i)[-1][-1]
                 mod = row_break[idx]
                 lookup = i%mod
@@ -631,11 +631,11 @@ class Tube:
             self.symbol_dict[i] = {lookup:sum(self.register[0:i])}
         return 
 
-    def print_consule(self, consule_range=range(0, 241, 40)):
+    def print_console(self, console_range=range(0, 241, 40)):
             if self.symbol_str == '':
-                self.assign_symbols(consule_range)
-            for x in consule_range:
-                print(self.symbol_str[x-consule_range.step:x])
+                self.assign_symbols(console_range)
+            for x in console_range:
+                print(self.symbol_str[x-console_range.step:x])
     
 def get_symbol(cycle, sprite_1):
     #get from processed, type of signal so can get cycle passage
