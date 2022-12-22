@@ -647,3 +647,123 @@ def get_symbol(cycle, sprite_1):
         return '.'
 
 #### Day 11 ####
+class StolenItem:
+    def __init__(self, initial_item):
+        self.item_init = initial_item
+        self.cur_item = initial_item
+        self.item_tracker = [initial_item]
+        self.multiples = [self.cur_item]
+        self.factor_list = []
+        self.remainder_list = []
+
+    def get_new_item(self, new_item, factor=None, operation=None, remainder=[]):
+        self.cur_item = new_item   
+        self.item_tracker.append(new_item)
+        return 
+    
+    def get_divisibility(self):
+        return set(self.factor_list)
+            
+#keep away class
+class KeepAway:
+    def __init__(self, monkey_rules, worried=True):
+        self.rules = monkey_rules
+        self.parsed_rules = []
+        self.monkey_list = []
+        self.worried = worried
+        
+        self.parse_rules()
+        
+        self.monkey_list = [Monkey(r, self.worried) for r in self.parsed_rules]            
+        self.divisibility_rules = [x.test for x in self.monkey_list]
+        
+        
+    def parse_rules(self):
+        n = len(self.rules)
+        for x in list(range(6, n+1, 7)):
+            self.parsed_rules.append(self.rules[x-6:x])
+            
+    def play_around(self, n):
+        for x in range(0, n):
+            for monkey in self.monkey_list:
+                throwing = monkey.take_turn(self.divisibility_rules)
+                for k, v in throwing.items():
+                    self.monkey_list[k].get_thrown_item(v)
+        return
+    
+    def get_monkey_business(self, n=2):
+        sorted_totals =  sorted([x.inspection_count for x in self.monkey_list], 
+                                reverse=True)
+        return np.multiply(*sorted_totals[0:n])
+
+
+class Monkey:
+    def __init__(self, monkey_init, worried=True):
+        self.monkey_init = monkey_init
+        self.inspection_count = 0
+        self.worried = worried
+        
+        self.set_attributes()
+        
+        
+    def get_lookup(self, n):
+        self.lambda_dict = {'old':lambda x: x, 
+                        '*':lambda x, y: x*y, #x[0]*x[1],
+                        '+':lambda x, y: x+y, #x[0]+x[1],
+                        '-':np.subtract,
+                        '/':np.divide
+                       }
+        try:
+            return int(self.operation_list[n])
+        except:
+            return self.lambda_dict[self.operation_list[n]]
+    
+    def set_attributes(self):
+        self.monkey_init
+        self.name = int(self.monkey_init[0].split(' ')[-1].replace(':', ''))
+        self.items = [StolenItem(int(x)) for x in self.monkey_init[1].split(': ')[-1].split(', ')]
+        self.operation_list = self.monkey_init[2].split('= ')[-1].split(' ')
+        self.operation_str = self.operation_list[1]
+        self.operation_int = self.get_lookup(2)
+        self.operation_function = self.get_lookup(1)
+        self.old = self.get_lookup(0)
+        self.test = int(self.monkey_init[3].split('by ')[-1])
+        self.true = int(self.monkey_init[4].split('monkey ')[-1])
+        self.false = int(self.monkey_init[5].split('monkey ')[-1])
+        
+        self.test_dict = {True:self.true, False:self.false}
+        
+    def build_operation(self, s_item):
+        if type(self.operation_int) == type(lambda x:x):
+            return self.operation_function(self.old(s_item), self.operation_int(s_item))
+        return self.operation_function(self.old(s_item), self.operation_int)
+    
+    def take_turn(self, divisibility_rules):
+        throw_dict = {} #monkey, items
+        if self.items != []:           
+            for stole in self.items:
+
+                self.inspection_count += 1
+                new = self.build_operation(stole.cur_item)
+                
+                if self.worried:
+                        new = int(np.floor(new / 3))
+                        stole.get_new_item(new)
+                else: #if self.worried == 0 & test = true // this FAILS - misses appends
+                    prod = np.product(divisibility_rules)
+                    stole.get_new_item(new%prod)
+                
+                test = (new % self.test == 0)
+               
+                
+                next_monkey = self.test_dict[test]
+                if next_monkey in throw_dict.keys():
+                    throw_dict[next_monkey].append(stole)
+                else:
+                    throw_dict[next_monkey] = [stole]
+            self.items = []    
+        return throw_dict
+    
+    def get_thrown_item(self, item):
+        self.items += item
+        
